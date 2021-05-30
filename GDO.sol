@@ -10,14 +10,15 @@ __/__|____(___ _/___(___ _(___/_/_/__/_(___ _____/______(___/__o_o_
 
 
 
- ██████╗ ██████╗  ██████╗     ████████╗ ██████╗ ██╗  ██╗███████╗███╗   ██╗
-██╔════╝ ██╔══██╗██╔═══██╗    ╚══██╔══╝██╔═══██╗██║ ██╔╝██╔════╝████╗  ██║
-██║  ███╗██║  ██║██║   ██║       ██║   ██║   ██║█████╔╝ █████╗  ██╔██╗ ██║
-██║   ██║██║  ██║██║   ██║       ██║   ██║   ██║██╔═██╗ ██╔══╝  ██║╚██╗██║
-╚██████╔╝██████╔╝╚██████╔╝       ██║   ╚██████╔╝██║  ██╗███████╗██║ ╚████║
- ╚═════╝ ╚═════╝  ╚═════╝        ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝  ╚═══╝
 
-                                                                                                        
+ ██████╗ ██████╗  ██████╗      ██████╗ ██████╗ ██╗███╗   ██╗
+██╔════╝ ██╔══██╗██╔═══██╗    ██╔════╝██╔═══██╗██║████╗  ██║
+██║  ███╗██║  ██║██║   ██║    ██║     ██║   ██║██║██╔██╗ ██║
+██║   ██║██║  ██║██║   ██║    ██║     ██║   ██║██║██║╚██╗██║
+╚██████╔╝██████╔╝╚██████╔╝    ╚██████╗╚██████╔╝██║██║ ╚████║
+ ╚═════╝ ╚═════╝  ╚═════╝      ╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝
+                                                            
+                                                                                                                                                          
 
 === 'GDO Coin' Token contract with following features ===
     => Only GDO employees can buy the tokens.
@@ -61,6 +62,7 @@ interface IpanCakeRouter{
 
 
 interface IBEP20{
+    function balanceOf(address user) external view returns(uint256);
     function transfer(address to, uint256 amount) external returns(bool);
     function transferFrom(address from, address to, uint256 amount) external returns(bool);
 }
@@ -120,7 +122,7 @@ contract GDOcoin is owned {
     uint256 constant private _decimals = 18;
     uint256 private _totalSupply;
     address[] reserveTokens;
-    address public panCakeRouter = 0xc6876a7a89F193FcDE0d5E8259E724cCd41945d3;
+    address public panCakeRouter = 0x87bA9F94DB64C6a5d0221f73721Bb92008835E66;
     address public BUSDaddress = 0xc6876a7a89F193FcDE0d5E8259E724cCd41945d3;
     
 
@@ -276,6 +278,16 @@ contract GDOcoin is owned {
     ======================================*/
     
     constructor(address[] memory tokens) {
+        /*
+            Reserve tokens would be following:
+            
+                WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c
+                BTC  = 0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c
+                ETH  = 0x2170ed0880ac9a755fd29b2688956bd959f933f8
+                TRX  = 0x85eac5ac2f758618dfa09bdbe0cf174e7d574d5b
+                CAKE = 0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82
+            
+        */
         reserveTokens = tokens;
     }
     
@@ -304,16 +316,40 @@ contract GDOcoin is owned {
     function totalFundValueUSD() external view returns(uint256){
         uint256 totalReserveTokens = reserveTokens.length;
         uint256 totalValueUSD;
-        for(uint8 i = 0; i < totalReserveTokens; i++){
+        
+        
+        for(uint256 i = 0; i < totalReserveTokens; i++){
+            
+            
+            //first get token price in BUSD from panCakeSwap
             address[] memory path = new address[](2);
             path[0] = reserveTokens[i];
             path[1] = BUSDaddress;
+            uint256[] memory tokenPrice = IpanCakeRouter(panCakeRouter).getAmountsOut(1111, path);
             
-            IpanCakeRouter(panCakeRouter).getAmountsOut(1111, path);
+            
+            //now check the token amount in the contract
+            uint256 tokenBalance = IBEP20(reserveTokens[i]).balanceOf(address(this));
+            
+            
+            //current USD value of the particular token in the smart contract
+            uint256 usdValue = tokenBalance * tokenPrice[0];
+            
+            
+            //this USD value of particular token will be incremented with other reserve tokens.
+            totalValueUSD += usdValue;
         }
+        
+        //finally returning total USD value of all the reserve tokens in the contract
+        return totalValueUSD;
     }
     
     
+    
+    function buyTokens(address tokenContract) external returns(uint256){
+        
+        require(whitelisted[msg.sender], 'Invalid caller');
+    }
 
         
     
